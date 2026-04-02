@@ -1,0 +1,62 @@
+# === Secrets (never commit) ===
+.env
+.env.local
+*.key
+*.pem
+*password*.txt
+*credentials*.zip
+
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+*.egg
+.eggs/
+dist/
+build/
+*.manifest
+
+# === Binaries ===
+*.dll
+*.exe
+*.so
+*.dylib
+*.zip
+
+# === Build outputs ===
+CMakeCache.txt
+CMakeFiles/
+*.obj
+*.o
+*.a
+*.pdb
+
+# === Data files ===
+*.db
+*.db-journal
+*.db-wal
+*.lattice
+*.lattice.wal
+*.wal
+
+# === IDE / OS ===
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# === Testing / Runtime ===
+.pytest_cache/
+server.log
+*.turns.json
+
+# === Internal (not for public repo) ===
+archive/
+checkpoint/
+python-sdk/
+website/
+scripts/
+.claude/
+LOVABLE-*.md

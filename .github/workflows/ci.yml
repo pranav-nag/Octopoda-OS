@@ -1,0 +1,54 @@
+name: CI & Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e python-sdk[dev] psycopg2-binary
+          pip install -e .
+          pip install fastapi uvicorn flask sentence-transformers numpy pytest mcp
+
+      - name: Run core tests (SQLite — no DB needed)
+        run: |
+          pytest tests/test_sqlite.py tests/test_backend.py tests/test_memory.py \
+                 tests/test_validation.py tests/test_licensing.py tests/test_runtime.py \
+                 tests/test_daemon.py tests/test_gc.py tests/test_temporal.py \
+                 tests/test_knowledge_graph.py tests/test_cloud_api.py \
+                 tests/test_mcp_server.py -v --tb=short
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to VPS
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: root
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /root/octopoda
+            git pull origin main
+            systemctl restart octopoda-api
+            sleep 15
+            curl -f http://localhost:8000/health || exit 1
+            echo "Deploy successful"

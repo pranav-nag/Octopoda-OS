@@ -1,0 +1,50 @@
+name: Feature Request
+description: Suggest a feature for Octopoda
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Got an idea for Octopoda? We'd love to hear it.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the problem or limitation you're running into.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: What would you like to see?
+      description: Describe your ideal solution. Code examples welcome.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which area?
+      options:
+        - Memory (remember/recall/search)
+        - Knowledge Graph
+        - Brain System (loop detection, drift, contradictions)
+        - Dashboard
+        - MCP Server
+        - Framework Integration (LangChain, CrewAI, etc.)
+        - Cloud API
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Have you tried any workarounds or other tools?
+    validations:
+      required: false
