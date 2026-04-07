@@ -32,32 +32,32 @@ pip install octopoda
 from octopoda import AgentRuntime
 
 agent = AgentRuntime("my_agent")
-agent.remember("user_pref", "Alice is vegetarian and lives in London")
-result = agent.recall("user_pref")
+agent.remember("key", "value")
+agent.recall("key")
 ```
 
-That's it. Memory persists across restarts, crashes, and deployments. Works locally with SQLite — no account required.
+That's it. Your agent now has persistent memory. It survives restarts, crashes, and deployments. Works locally with SQLite — no account required.
 
-Want cloud sync and the dashboard? Set an API key:
+Want cloud sync and the dashboard? Just set an API key:
 
 ```bash
-export OCTOPODA_API_KEY=sk-octopoda-...   # Get yours at octopodas.com
+export OCTOPODA_API_KEY=sk-octopoda-...   # Get yours free at octopodas.com
 ```
 
-Same code, now backed by PostgreSQL with semantic search, real-time monitoring, and multi-agent observability.
+Same code, now backed by PostgreSQL with real-time monitoring and multi-agent observability.
 
 ---
 
 ## Why Octopoda
 
-AI agents forget everything between sessions. Every framework treats memory as disposable. Octopoda gives agents:
+AI agents forget everything between sessions. Every framework treats memory as disposable. Octopoda gives your agents:
 
 1. **Persistent memory** that survives restarts and crashes
 2. **Semantic search** to find memories by meaning, not just exact keys
 3. **Loop detection** that catches agents stuck in repetitive patterns
-4. **Agent-to-agent messaging** for multi-agent coordination
-5. **Knowledge graphs** that map entities and relationships automatically
-6. **Real-time observability** so you can see what your agents know
+4. **Agent messaging** for multi-agent coordination
+5. **Audit trail** so you can see every decision an agent made and why
+6. **Real-time dashboard** to monitor what your agents know and how they're performing
 
 ---
 
