@@ -1139,26 +1139,99 @@ class AgentRuntime:
         else:
             severity = "red"
 
-        # --- Build recovery suggestions based on severity ---
+        # --- Classify the loop type and root cause ---
+        loop_type = None
+        root_cause = None
+        fix = None
+        signal_types = [s["type"] for s in signals]
+
+        if severity in ("orange", "red") and signals:
+            # Classify based on which signals fired
+            has_similarity = "write_similarity" in signal_types
+            has_overwrite = "key_overwrite" in signal_types
+            has_velocity = "velocity_spike" in signal_types
+            has_alerts = "alert_frequency" in signal_types
+            has_drift = "goal_drift" in signal_types
+
+            if has_overwrite and has_similarity:
+                loop_type = "retry_loop"
+                root_cause = ("Your agent is writing to the same key with nearly identical values. "
+                             "This usually means the agent is retrying an operation that already succeeded, "
+                             "or a prompt is telling it to 'update' something on every turn.")
+                fix = "consolidate"
+            elif has_velocity and has_similarity:
+                loop_type = "polling_loop"
+                root_cause = ("Your agent is writing very fast with similar content. "
+                             "This looks like a polling loop — the agent is storing data on every tick "
+                             "instead of only when something changes.")
+                fix = "pause"
+            elif has_overwrite and not has_similarity:
+                loop_type = "oscillation"
+                root_cause = ("Your agent keeps changing its mind on the same key. "
+                             "It's writing different values back and forth, which usually means "
+                             "conflicting instructions in the prompt or two parts of the system disagreeing.")
+                fix = "check_prompt"
+            elif has_similarity and not has_overwrite:
+                loop_type = "duplication"
+                root_cause = ("Your agent is storing the same information under different keys. "
+                             "The content is semantically identical but spread across multiple entries. "
+                             "This wastes memory and makes recall less reliable.")
+                fix = "consolidate"
+            elif has_drift:
+                loop_type = "drift"
+                root_cause = ("Your agent has wandered off from its stated goal. "
+                             "Recent writes have low relevance to what it's supposed to be doing.")
+                fix = "refocus"
+            elif has_velocity:
+                loop_type = "burst"
+                root_cause = ("Sudden spike in write volume. Could be a batch operation (normal) "
+                             "or a runaway loop. Check if this was intentional.")
+                fix = "monitor"
+            else:
+                loop_type = "unknown"
+                root_cause = "Multiple loop signals detected but the pattern doesn't match a known type."
+                fix = "investigate"
+
+        # --- Build recovery suggestions based on type ---
         recovery = []
-        if severity == "red":
+        if fix == "consolidate":
+            recovery = [
+                "Run agent.consolidate() to merge the duplicate memories",
+                "Check your prompt — is it telling the agent to 'save' or 'update' every turn?",
+                "Add a check before writing: only store if the value actually changed",
+            ]
+        elif fix == "pause":
+            recovery = [
+                "Pause the agent — it's burning through writes",
+                "Add a cooldown between writes (e.g. only write once per minute)",
+                "Check if you have a loop that calls remember() on every iteration",
+            ]
+        elif fix == "check_prompt":
+            recovery = [
+                "Your agent is flip-flopping — check for contradictory instructions",
+                "Look at the replay below to see the values it's switching between",
+                "Consider making the decision final: write once, don't overwrite",
+            ]
+        elif fix == "refocus":
+            recovery = [
+                "Agent has drifted from its goal — review what it's been writing",
+                "Call agent.update_progress() to refocus on the next milestone",
+                "Consider setting a more specific sub-goal",
+            ]
+        elif severity == "red":
             recovery = [
                 "IMMEDIATE: Pause or restart the agent",
                 "Run agent.consolidate() to remove duplicate memories",
-                "Run agent.forget_stale() to clean old memories",
                 "Check agent prompt for unintended loop patterns",
-                "Consider restoring from snapshot: agent.restore()",
             ]
         elif severity == "orange":
             recovery = [
                 "Monitor closely for the next few minutes",
                 "Run agent.memory_health() for a full diagnostic",
-                "Consider running agent.consolidate(dry_run=True) to check for duplicates",
             ]
         elif severity == "yellow":
             recovery = [
-                "No immediate action needed",
-                "Run agent.memory_health() periodically to track trends",
+                "No immediate action needed — keep an eye on it",
             ]
 
         # --- Cost estimation (additive — never breaks existing response) ---
@@ -1231,6 +1304,9 @@ class AgentRuntime:
         }
 
         # Add new fields only if they have data (backward compatible)
+        if loop_type is not None:
+            result["loop_type"] = loop_type
+            result["root_cause"] = root_cause
         if cost_data is not None:
             result["cost"] = cost_data
         if prediction_data is not None:
