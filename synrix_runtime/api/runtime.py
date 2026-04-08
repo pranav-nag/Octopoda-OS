@@ -35,6 +35,12 @@ _repeat_tracker_lock = threading.Lock()
 _write_tracker: dict = {}  # agent_id -> [{"time": float, "key": str}, ...]
 _write_tracker_lock = threading.Lock()
 
+# Loop status cache: prevents scores from snapping back to 100 when write window expires.
+# Detected loops decay gradually over 15 minutes instead of vanishing instantly.
+_loop_status_cache: dict = {}  # tracker_key -> {"score": int, "severity": str, "time": float, ...}
+_loop_cache_lock = threading.Lock()
+_LOOP_CACHE_DECAY_SECONDS = 3600  # 1 hour to fully decay back to green
+
 
 @dataclass
 class MemoryResult:
@@ -1027,7 +1033,7 @@ class AgentRuntime:
         if hot_keys:
             worst_key = max(hot_keys, key=hot_keys.get)
             worst_count = hot_keys[worst_key]
-            score -= min(25, worst_count * 5)
+            score -= min(40, worst_count * 3)
             signals.append({
                 "type": "key_overwrite",
                 "severity": "red" if worst_count >= 5 else "orange",
@@ -1043,7 +1049,9 @@ class AgentRuntime:
         writes_per_minute = len(last_60s)
         writes_per_5min = len(last_300s)
         if writes_per_minute >= 10:
-            score -= 20
+            # Scale: 10 wpm = -20, 15 wpm = -25, 20+ wpm = -30
+            velocity_penalty = min(30, 15 + writes_per_minute)
+            score -= velocity_penalty
             signals.append({
                 "type": "velocity_spike",
                 "severity": "red",
@@ -1052,7 +1060,7 @@ class AgentRuntime:
                 "action": "Pause the agent immediately. Check for infinite loops in the agent logic.",
             })
         elif writes_per_minute >= 5:
-            score -= 10
+            score -= (5 + writes_per_minute)
             signals.append({
                 "type": "velocity_spike",
                 "severity": "orange",
@@ -1074,7 +1082,9 @@ class AgentRuntime:
                         recent_alerts.append(val)
 
             if len(recent_alerts) >= 5:
-                score -= 20
+                # Scale: 5 alerts = -15, 10 = -20, 15 = -25, 20+ = -30
+                alert_penalty = min(30, 10 + len(recent_alerts))
+                score -= alert_penalty
                 alert_types = {}
                 for al in recent_alerts:
                     t = al.get("type", "unknown")
@@ -1130,6 +1140,35 @@ class AgentRuntime:
 
         # --- Calculate overall severity ---
         score = max(0, score)
+
+        # --- Persist loop detections so scores don't flicker ---
+        # Once a loop is detected, cache the result. Subsequent polls return
+        # the cached score until a WORSE loop is detected (score goes lower).
+        # Scores only improve when the agent is explicitly consolidated/fixed.
+        with _loop_cache_lock:
+            cached = _loop_status_cache.get(tracker_key)
+            if score < 80:
+                # Active loop — cache if worse than (or replacing) existing
+                if not cached or score <= cached["score"]:
+                    _loop_status_cache[tracker_key] = {
+                        "score": score, "time": now,
+                        "signals": signals,
+                    }
+                else:
+                    # Current detection is less severe than cached — keep cached
+                    score = cached["score"]
+                    if not signals and cached.get("signals"):
+                        signals = cached["signals"]
+            elif cached:
+                # No active loop right now, but we have a cached detection.
+                # Keep returning the cached score — it persists until the
+                # agent is consolidated, memories are cleaned, or server restarts.
+                score = cached["score"]
+                if not signals and cached.get("signals"):
+                    signals = cached["signals"]
+
+        score = max(0, min(100, score))
+
         if score >= 80:
             severity = "green"
         elif score >= 60:

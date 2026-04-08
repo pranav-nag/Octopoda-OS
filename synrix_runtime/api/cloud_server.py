@@ -148,7 +148,8 @@ async def _prewarm_models():
         except Exception as e:
             import logging
             logging.getLogger("synrix.runtime").warning("Model pre-warm failed: %s", e)
-    await asyncio.get_event_loop().run_in_executor(_executor, _load)
+    import threading
+    threading.Thread(target=_load, name="model-prewarm", daemon=True).start()
 
 
 @app.on_event("startup")
@@ -3093,6 +3094,7 @@ def _increment_platform_usage(tenant_id: str):
 def _save_tenant_settings(tenant_id: str, settings: dict):
     """Persist tenant settings to DB (API keys encrypted at rest)."""
     _tenant_settings[tenant_id] = settings  # in-memory cache holds plaintext
+    _tenant_settings_ts[tenant_id] = time.time()  # refresh cache TTL
     try:
         from synrix_runtime.api.tenant import TenantManager
         tm = TenantManager.get_instance()
@@ -3690,6 +3692,16 @@ async def brain_cost_summary(auth=Depends(verify_auth)):
             backend = tm.get_backend(tenant_id)
         except Exception:
             pass
+
+        # Fall back to daemon backend for local mode
+        if not backend:
+            try:
+                from synrix_runtime.core.daemon import RuntimeDaemon
+                daemon = RuntimeDaemon.get_instance()
+                if daemon and daemon.backend:
+                    backend = daemon.backend
+            except Exception:
+                pass
 
         if not backend:
             return {"model": model, "total_saved": 0, "loops_caught": 0,

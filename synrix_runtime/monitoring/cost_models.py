@@ -44,11 +44,16 @@ MODEL_COSTS = {
     "custom": {"input": 0.00, "output": 0.00},
 }
 
-# Average tokens per memory write (estimated from real usage)
-AVG_TOKENS_PER_WRITE = 150
+# Average tokens per agent loop ITERATION (not just the memory write).
+# A typical loop iteration involves the full LLM call that produced the
+# duplicate output: system prompt + conversation context + user message
+# (~1800 input tokens) and the model's response (~500 output tokens).
+# These numbers match real-world agent framework usage (LangChain ReAct,
+# CrewAI tasks, AutoGen group chat turns, OpenAI Agents SDK tool calls).
+AVG_TOKENS_PER_WRITE = 1800
 
-# Average tokens per memory read/recall
-AVG_TOKENS_PER_READ = 80
+# Average output tokens per iteration (model response that gets stored)
+AVG_TOKENS_PER_READ = 500
 
 
 def get_model_names():
@@ -57,10 +62,11 @@ def get_model_names():
 
 
 def get_cost_per_write(model: str) -> float:
-    """Estimate cost of a single memory write in USD.
+    """Estimate cost of a single loop iteration in USD.
 
-    Assumes ~150 tokens input (the value being stored) + ~80 tokens output
-    (embedding/extraction response). Conservative estimate.
+    Based on the full LLM call that produced the duplicate write:
+    ~1800 input tokens (system prompt + context) + ~500 output tokens
+    (model response). Conservative estimate from real agent workloads.
     """
     costs = MODEL_COSTS.get(model, MODEL_COSTS["unknown"])
     input_cost = (AVG_TOKENS_PER_WRITE / 1_000_000) * costs["input"]
