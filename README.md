@@ -52,11 +52,30 @@ octopoda
 
 Open **http://localhost:7842** — same dashboard as the cloud version, running against your local data. No account needed.
 
-Want cloud sync across machines? Just add an API key:
+Want cloud sync across machines? Sign up free at [octopodas.com](https://octopodas.com), set your API key, and your agents sync to the cloud automatically:
 
 ```bash
-export OCTOPODA_API_KEY=sk-octopoda-...   # Free at octopodas.com
+export OCTOPODA_API_KEY=sk-octopoda-...
 ```
+
+Same code, same dashboard — now backed by PostgreSQL with multi-device sync and team access.
+
+---
+
+## Local vs Cloud
+
+| | Local | Cloud |
+|---|---|---|
+| **Setup** | `pip install octopoda` | Sign up at octopodas.com |
+| **Storage** | SQLite on your machine | PostgreSQL + pgvector |
+| **Dashboard** | http://localhost:7842 | octopodas.com/dashboard |
+| **Account needed** | No | Yes (free) |
+| **Data stays on your machine** | Yes | Stored on cloud |
+| **Multi-device sync** | No | Yes |
+| **Semantic search** | Needs `octopoda[ai]` extra | Built-in |
+| **Upgrade path** | Set `OCTOPODA_API_KEY` | Already there |
+
+Start local, upgrade to cloud when you need sync or team access. Both use the same API, same dashboard design, same code.
 
 ---
 
